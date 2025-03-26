@@ -11,6 +11,7 @@ const CITY = process.env.CITY;
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const MODO_BOT_PRIVADO = process.env.MODO_BOT_PRIVADO === "true";
+const DEBUG = process.env.DEBUG === "true";
 
 const API_URL = `https://api.openweathermap.org/data/2.5/weather?q=${CITY}&appid=${API_KEY}&units=metric`;
 const FORECAST_URL = `https://api.openweathermap.org/data/2.5/forecast?q=${CITY}&appid=${API_KEY}&units=metric`;
@@ -21,37 +22,8 @@ let ultimoMensajeClima = "";
 let ultimoMensajeManana = "";
 let ultimoMensajeMasTarde = "";
 
-async function sendTelegramNotification(message) {
-    if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return;
-    const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
-    try {
-        const res = await axios.post(url, {
-            chat_id: TELEGRAM_CHAT_ID,
-            text: message,
-            parse_mode: "Markdown"
-        });
-        mensajesEnviados.push(res.data.result.message_id);
-    } catch (error) {
-        console.error("❌ Error al enviar a Telegram:", error.response?.data || error.message);
-    }
-}
-
-async function eliminarMensajesDelDia() {
-    const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/deleteMessage`;
-    for (const id of mensajesEnviados) {
-        try {
-            await axios.post(url, {
-                chat_id: TELEGRAM_CHAT_ID,
-                message_id: id
-            });
-        } catch (err) {
-            console.warn("⚠️ No se pudo borrar mensaje:", id);
-        }
-    }
-    mensajesEnviados = [];
-    ultimoMensajeClima = "";
-    ultimoMensajeManana = "";
-    ultimoMensajeMasTarde = "";
+function logDebug(...args) {
+    if (DEBUG) console.log(...args);
 }
 
 function capitalize(text) {
@@ -82,13 +54,48 @@ function traducirDescripcion(desc) {
     return traducciones[desc.toLowerCase()] || capitalize(desc);
 }
 
+async function sendTelegramNotification(message) {
+    if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return;
+    const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
+    try {
+        const res = await axios.post(url, {
+            chat_id: TELEGRAM_CHAT_ID,
+            text: message,
+            parse_mode: "Markdown"
+        });
+        mensajesEnviados.push(res.data.result.message_id);
+        logDebug("📤 Mensaje enviado a Telegram:", message);
+    } catch (error) {
+        logDebug("❌ Error al enviar a Telegram:", error.response?.data || error.message);
+    }
+}
+
+async function eliminarMensajesDelDia() {
+    const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/deleteMessage`;
+    for (const id of mensajesEnviados) {
+        try {
+            await axios.post(url, {
+                chat_id: TELEGRAM_CHAT_ID,
+                message_id: id
+            });
+        } catch {
+            logDebug("⚠️ No se pudo borrar mensaje:", id);
+        }
+    }
+    mensajesEnviados = [];
+    ultimoMensajeClima = "";
+    ultimoMensajeManana = "";
+    ultimoMensajeMasTarde = "";
+    logDebug("🧹 Historial de mensajes limpiado");
+}
+
 async function sendWeatherToTelegram(data) {
     const mensaje = await getFullWeatherMessage();
     if (mensaje !== ultimoMensajeClima) {
         await sendTelegramNotification(mensaje);
         ultimoMensajeClima = mensaje;
     } else {
-        console.log("⏸️ Clima sin cambios. No se volvió a enviar.");
+        logDebug("⏸️ Clima sin cambios. No se volvió a enviar.");
     }
 
     const temp = data.main.temp;
@@ -188,19 +195,26 @@ async function checkAlerts() {
 }
 
 async function checkWeather() {
-    const response = await axios.get(API_URL);
-    const data = response.data;
-    const temp = data.main.temp;
+    logDebug(`⏰ [${new Date().toLocaleTimeString()}] Ejecutando checkWeather()`);
 
-    await sendWeatherToTelegram(data);
+    try {
+        const response = await axios.get(API_URL);
+        const data = response.data;
+        const temp = data.main.temp;
 
-    if (lastTemp !== null && Math.abs(temp - lastTemp) >= 5) {
-        await sendTelegramNotification(`⚠️ *Cambio brusco en la temperatura:* ${lastTemp}°C → ${temp}°C`);
+        await sendWeatherToTelegram(data);
+
+        if (lastTemp !== null && Math.abs(temp - lastTemp) >= 5) {
+            await sendTelegramNotification(`⚠️ *Cambio brusco en la temperatura:* ${lastTemp}°C → ${temp}°C`);
+        }
+
+        lastTemp = temp;
+    } catch (error) {
+        logDebug("❌ Error en checkWeather():", error.message);
     }
-
-    lastTemp = temp;
 }
 
+// ⏰ Cron programado
 if (MODO_BOT_PRIVADO) {
     cron.schedule("*/30 * * * *", checkWeather);
     cron.schedule("1 0 * * *", eliminarMensajesDelDia);
@@ -213,6 +227,7 @@ if (require.main === module) {
     });
 }
 
+// Exportaciones para comandos.js
 module.exports = {
     getCurrentWeather: async () => {
         const res = await axios.get(API_URL);
