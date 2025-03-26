@@ -1,0 +1,16 @@
+# Node.js
+node_modules/
+.env
+.DS_Store
+*.log
+
+# Railway
+*.sqlite
+*.db
+
+# IDE/editor configs
+.vscode/
+.idea/
+
+# Sistema operativo
+Thumbs.db
