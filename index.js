@@ -10,6 +10,7 @@ const API_KEY = process.env.API_KEY?.trim();
 const CITY = process.env.CITY;
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const MODO_BOT_PRIVADO = process.env.MODO_BOT_PRIVADO === "true";
 
 const API_URL = `https://api.openweathermap.org/data/2.5/weather?q=${CITY}&appid=${API_KEY}&units=metric`;
 const FORECAST_URL = `https://api.openweathermap.org/data/2.5/forecast?q=${CITY}&appid=${API_KEY}&units=metric`;
@@ -21,6 +22,7 @@ let ultimoMensajeManana = "";
 let ultimoMensajeMasTarde = "";
 
 async function sendTelegramNotification(message) {
+    if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return;
     const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
     try {
         const res = await axios.post(url, {
@@ -199,13 +201,15 @@ async function checkWeather() {
     lastTemp = temp;
 }
 
-cron.schedule("*/30 * * * *", checkWeather);
-cron.schedule("1 0 * * *", eliminarMensajesDelDia);
+if (MODO_BOT_PRIVADO) {
+    cron.schedule("*/30 * * * *", checkWeather);
+    cron.schedule("1 0 * * *", eliminarMensajesDelDia);
+}
 
 if (require.main === module) {
     app.listen(PORT, () => {
         console.log(`🚀 Servidor en http://localhost:${PORT}`);
-        checkWeather();
+        if (MODO_BOT_PRIVADO) checkWeather();
     });
 }
 
