@@ -14,9 +14,9 @@ const LAST_UPDATE_FILE = path.join(__dirname, ".data", "lastUpdate.json");
 
 let ubicacionesPorChat = {};
 let cacheMensajes = {};
+let cacheAutoRespuesta = {};
 let isProcessing = false;
 
-// 🔁 Leer lastUpdateId desde archivo
 function cargarUltimoUpdate() {
   try {
     const data = fs.readFileSync(LAST_UPDATE_FILE, "utf-8");
@@ -26,7 +26,6 @@ function cargarUltimoUpdate() {
   }
 }
 
-// 💾 Guardar lastUpdateId en archivo
 function guardarUltimoUpdate(id) {
   fs.writeFileSync(LAST_UPDATE_FILE, JSON.stringify({ lastUpdateId: id }), "utf-8");
 }
@@ -55,7 +54,6 @@ function mensajeDeAyuda() {
     `También podés escribirme un mensaje o nota de voz y te contesto 😉`;
 }
 
-// 🔁 Ciclo principal
 setInterval(async () => {
   if (isProcessing) return;
   isProcessing = true;
@@ -80,7 +78,6 @@ setInterval(async () => {
 
       if (!chatId) continue;
 
-      // Ubicación enviada
       if (location) {
         ubicacionesPorChat[chatId] = {
           lat: location.latitude,
@@ -98,7 +95,6 @@ setInterval(async () => {
         await sendTelegramReply(chatId, mensaje);
       }
 
-      // Comandos
       else if (msgTexto === "/ahora") {
         const mensaje = await getCurrentWeather();
         if (cacheMensajes[chatId] !== mensaje) {
@@ -159,10 +155,18 @@ setInterval(async () => {
       }
 
       else if (msgTexto) {
-        const mensaje = await getFullWeatherMessage();
-        if (cacheMensajes[chatId + "_auto"] !== mensaje) {
-          cacheMensajes[chatId + "_auto"] = mensaje;
-          await sendTelegramReply(chatId, mensaje);
+        const ahora = new Date();
+        const claveMinuto = `${ahora.getHours()}:${ahora.getMinutes()}`;
+
+        if (cacheAutoRespuesta[chatId] === claveMinuto) {
+          console.log("⏸️ Respuesta automática ya enviada este minuto.");
+        } else {
+          const mensaje = await getFullWeatherMessage();
+          if (cacheMensajes[chatId + "_auto"] !== mensaje) {
+            cacheMensajes[chatId + "_auto"] = mensaje;
+            cacheAutoRespuesta[chatId] = claveMinuto;
+            await sendTelegramReply(chatId, mensaje);
+          }
         }
       }
 
