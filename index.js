@@ -3,6 +3,12 @@ const express = require("express");
 const axios = require("axios");
 const cron = require("node-cron");
 
+if (MODO_BOT_PRIVADO || process.env.BOT_COMBINADO === "true") {
+  cron.schedule("*/30 * * * *", checkWeather);
+  cron.schedule("1 0 * * *", eliminarMensajesDelDia);
+}
+
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
