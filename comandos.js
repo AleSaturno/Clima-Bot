@@ -9,7 +9,7 @@ const {
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 let lastUpdateId = 0;
-const ubicacionesPorChat = {}; // Memoria temporal por sesión
+const ubicacionesPorChat = {};
 
 async function sendTelegramReply(chatId, text) {
   if (!text || !chatId) return;
@@ -44,6 +44,9 @@ setInterval(async () => {
     if (!updates.length) return;
 
     for (const update of updates) {
+      // 🔐 Antiduplicado: ignorar updates ya procesados
+      if (update.update_id <= lastUpdateId) continue;
+
       const msgTexto = update.message?.text?.toLowerCase();
       const esVoz = !!update.message?.voice;
       const location = update.message?.location;
@@ -51,7 +54,6 @@ setInterval(async () => {
 
       if (!chatId) continue;
 
-      // 📍 Si el usuario envía ubicación
       if (location) {
         ubicacionesPorChat[chatId] = {
           lat: location.latitude,
@@ -67,10 +69,7 @@ setInterval(async () => {
           `💧 Humedad: ${data.main.humidity}%\n💨 Viento: ${data.wind.speed} km/h\n` +
           `🌥️ Estado: ${data.weather[0].description}`;
         await sendTelegramReply(chatId, mensaje);
-      }
-
-      // 🧭 /ahora
-      else if (msgTexto === "/ahora") {
+      } else if (msgTexto === "/ahora") {
         if (ubicacionesPorChat[chatId]) {
           const { lat, lon } = ubicacionesPorChat[chatId];
           const res = await axios.get(
@@ -83,10 +82,7 @@ setInterval(async () => {
           const info = await getCurrentWeather();
           await sendTelegramReply(chatId, info);
         }
-      }
-
-      // ⏰ /mas-tarde o /mañana
-      else if (msgTexto === "/mas-tarde" || msgTexto === "/mañana") {
+      } else if (msgTexto === "/mas-tarde" || msgTexto === "/mañana") {
         const tipo = msgTexto.includes("mañana") ? "mañana" : "short";
 
         if (ubicacionesPorChat[chatId]) {
@@ -122,16 +118,10 @@ setInterval(async () => {
           const info = await getForecastData(tipo);
           await sendTelegramReply(chatId, info || "⏸️ Sin cambios desde la última vez.");
         }
-      }
-
-      // ⚠️ /alertas
-      else if (msgTexto === "/alertas") {
+      } else if (msgTexto === "/alertas") {
         const info = await checkAlerts();
         await sendTelegramReply(chatId, info);
-      }
-
-      // 📍 /donde
-      else if (msgTexto === "/donde") {
+      } else if (msgTexto === "/donde") {
         if (ubicacionesPorChat[chatId]) {
           const { lat, lon } = ubicacionesPorChat[chatId];
           const mensaje = `📍 *Tu ubicación guardada:*\nLatitud: ${lat}\nLongitud: ${lon}`;
@@ -139,10 +129,7 @@ setInterval(async () => {
         } else {
           await sendTelegramReply(chatId, "❗ No tengo tu ubicación. Podés enviármela desde el clip 📎 o usando /ubicacion.");
         }
-      }
-
-      // 🗺️ /ubicacion con botón
-      else if (msgTexto === "/ubicacion") {
+      } else if (msgTexto === "/ubicacion") {
         const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
         await axios.post(url, {
           chat_id: chatId,
@@ -156,30 +143,20 @@ setInterval(async () => {
             one_time_keyboard: true
           }
         });
-      }
-
-      // 📘 /start
-      else if (msgTexto === "/start") {
+      } else if (msgTexto === "/start") {
         await sendTelegramReply(chatId, mensajeDeAyuda());
-      }
-
-      // 🎙️ Voz
-      else if (esVoz) {
+      } else if (esVoz) {
         const clima = await getFullWeatherMessage();
         const mensaje = `🎙️ *¡Escuché tu audio!*\n\n${clima}`;
         await sendTelegramReply(chatId, mensaje);
-      }
-
-      // 📝 Cualquier texto
-      else if (msgTexto) {
+      } else if (msgTexto) {
         const clima = await getFullWeatherMessage();
         await sendTelegramReply(chatId, clima);
       }
     }
 
-    // ✅ Actualizar correctamente el último update procesado
+    // ✅ Actualiza el último ID procesado una sola vez
     lastUpdateId = updates[updates.length - 1].update_id;
-    console.log("✅ Último update procesado:", lastUpdateId);
   } catch (error) {
     console.error("❌ Error al procesar comandos:", error.message);
   }
