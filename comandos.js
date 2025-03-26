@@ -8,15 +8,14 @@ const {
 } = require("./index");
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-
 let lastUpdateId = 0;
 
-async function sendTelegramReply(text) {
-    if (!text) return;
+// ✅ Nueva función con chatId dinámico
+async function sendTelegramReply(chatId, text) {
+    if (!text || !chatId) return;
     const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
     await axios.post(url, {
-        chat_id: TELEGRAM_CHAT_ID,
+        chat_id: chatId,
         text,
         parse_mode: "Markdown"
     });
@@ -43,30 +42,33 @@ setInterval(async () => {
         for (const update of updates) {
             const msgTexto = update.message?.text?.toLowerCase();
             const esVoz = !!update.message?.voice;
+            const chatId = update.message?.chat?.id;
 
-            console.log("📥 Mensaje recibido:", msgTexto || (esVoz && "[voz]"));
+            console.log("📥 Mensaje recibido:", msgTexto || (esVoz && "[voz]"), "de", chatId);
+
+            if (!chatId) continue;
 
             if (msgTexto === "/ahora") {
                 const info = await getCurrentWeather();
-                await sendTelegramReply(info);
+                await sendTelegramReply(chatId, info);
             } else if (msgTexto === "/mas-tarde") {
                 const info = await getForecastData("short");
-                await sendTelegramReply(info || "⏸️ Sin cambios desde la última vez.");
+                await sendTelegramReply(chatId, info || "⏸️ Sin cambios desde la última vez.");
             } else if (msgTexto === "/mañana") {
                 const info = await getForecastData("mañana");
-                await sendTelegramReply(info || "⏸️ El pronóstico de mañana no ha cambiado.");
+                await sendTelegramReply(chatId, info || "⏸️ El pronóstico de mañana no ha cambiado.");
             } else if (msgTexto === "/alertas") {
                 const info = await checkAlerts();
-                await sendTelegramReply(info);
+                await sendTelegramReply(chatId, info);
             } else if (msgTexto === "/start") {
-                await sendTelegramReply(mensajeDeAyuda());
+                await sendTelegramReply(chatId, mensajeDeAyuda());
             } else if (esVoz) {
                 const clima = await getFullWeatherMessage();
                 const mensaje = `🎙️ *¡Escuché tu audio!*\n\n${clima}`;
-                await sendTelegramReply(mensaje);
+                await sendTelegramReply(chatId, mensaje);
             } else if (msgTexto) {
                 const clima = await getFullWeatherMessage();
-                await sendTelegramReply(clima);
+                await sendTelegramReply(chatId, clima);
             }
         }
 
