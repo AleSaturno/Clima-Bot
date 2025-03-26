@@ -19,8 +19,6 @@ const FORECAST_URL = `https://api.openweathermap.org/data/2.5/forecast?q=${CITY}
 let lastTemp = null;
 let mensajesEnviados = [];
 let cacheClima = {};
-let cacheManana = {};
-let cacheMasTarde = {};
 
 function logDebug(...args) {
   if (DEBUG) console.log(...args);
@@ -64,7 +62,7 @@ async function sendTelegramNotification(message) {
       parse_mode: "Markdown"
     });
     mensajesEnviados.push(res.data.result.message_id);
-    logDebug("📤 Mensaje enviado a Telegram:", message);
+    logDebug("📤 Mensaje enviado a Telegram");
   } catch (error) {
     logDebug("❌ Error al enviar a Telegram:", error.response?.data || error.message);
   }
@@ -84,13 +82,15 @@ async function eliminarMensajesDelDia() {
   }
   mensajesEnviados = [];
   cacheClima[TELEGRAM_CHAT_ID] = "";
-  cacheManana[TELEGRAM_CHAT_ID] = "";
-  cacheMasTarde[TELEGRAM_CHAT_ID] = "";
   logDebug("🧹 Historial de mensajes limpiado");
 }
 
 async function sendWeatherToTelegram(data) {
   const mensaje = await getFullWeatherMessage();
+
+  if (!cacheClima[TELEGRAM_CHAT_ID]) {
+    cacheClima[TELEGRAM_CHAT_ID] = "";
+  }
 
   if (cacheClima[TELEGRAM_CHAT_ID] !== mensaje) {
     await sendTelegramNotification(mensaje);
@@ -138,14 +138,7 @@ async function getForecastData(tipo = "mañana") {
       const desc = traducirDescripcion(item.weather[0].description);
       return `🕒 *${hora}:* ${item.main.temp.toFixed(1)}°C, ${desc}`;
     }).join('\n');
-
-    const mensaje = `🔮 *Próximas horas:*\n${horas}`;
-    if (mensaje !== cacheMasTarde[TELEGRAM_CHAT_ID]) {
-      cacheMasTarde[TELEGRAM_CHAT_ID] = mensaje;
-      return mensaje;
-    } else {
-      return null;
-    }
+    return `🔮 *Próximas horas:*\n${horas}`;
   } else {
     const mañana = new Date();
     mañana.setDate(mañana.getDate() + 1);
@@ -161,16 +154,9 @@ async function getForecastData(tipo = "mañana") {
     const max = Math.max(...temps).toFixed(1);
     const desc = traducirDescripcion(descripciones[Math.floor(descripciones.length / 2)] || descripciones[0]);
 
-    const mensaje = `📅 *Pronóstico para mañana (${formateada}):*\n` +
+    return `📅 *Pronóstico para mañana (${formateada}):*\n` +
       `🌡️ Mínima: ${min}°C | Máxima: ${max}°C\n` +
       `🌥️ Estado general: ${desc}`;
-
-    if (mensaje !== cacheManana[TELEGRAM_CHAT_ID]) {
-      cacheManana[TELEGRAM_CHAT_ID] = mensaje;
-      return mensaje;
-    } else {
-      return null;
-    }
   }
 }
 
@@ -216,7 +202,6 @@ async function checkWeather() {
   }
 }
 
-// Ejecutar cada 30 minutos y limpiar diario
 if (MODO_BOT_PRIVADO) {
   cron.schedule("*/30 * * * *", checkWeather);
   cron.schedule("1 0 * * *", eliminarMensajesDelDia);
