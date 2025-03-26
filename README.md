@@ -23,3 +23,20 @@ Un bot de Telegram que consulta el clima actual, pronóstico para más tarde o e
 git clone https://github.com/tu-usuario/bot-clima.git
 cd bot-clima
 npm install
+```
+📄 Configurá tu .env
+Crea un archivo .env en la raíz del proyecto basado en .env.example:
+```
+API_KEY=TU_API_KEY_DE_OPENWEATHER
+CITY=Cordoba
+TELEGRAM_TOKEN=TU_BOT_TOKEN
+TELEGRAM_CHAT_ID=123456789
+```
+▶️ Ejecutar localmente
+```
+node index.js
+node comandos.js
+```
+El bot empieza a escuchar y responder a comandos o mensajes de voz desde Telegram.
+
+
