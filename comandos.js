@@ -12,10 +12,17 @@ const {
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const LAST_UPDATE_FILE = path.join(__dirname, ".data", "lastUpdate.json");
 
+// ✅ Asegura que la carpeta .data exista
+const dataDir = path.join(__dirname, ".data");
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir);
+}
+
 let ubicacionesPorChat = {};
 let cacheMensajes = {};
 let cacheAutoRespuesta = {};
 let isProcessing = false;
+let procesados = new Set();
 
 function cargarUltimoUpdate() {
   try {
@@ -69,7 +76,8 @@ setInterval(async () => {
     }
 
     for (const update of updates) {
-      if (update.update_id <= lastUpdateId) continue;
+      if (update.update_id <= lastUpdateId || procesados.has(update.update_id)) continue;
+      procesados.add(update.update_id);
 
       const msgTexto = update.message?.text?.toLowerCase();
       const esVoz = !!update.message?.voice;
