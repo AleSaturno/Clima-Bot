@@ -3,10 +3,6 @@ const express = require("express");
 const axios = require("axios");
 const cron = require("node-cron");
 
-if (MODO_BOT_PRIVADO || process.env.BOT_COMBINADO === "true") {
-  cron.schedule("*/30 * * * *", checkWeather);
-  cron.schedule("1 0 * * *", eliminarMensajesDelDia);
-}
 
 
 const app = express();
@@ -18,6 +14,12 @@ const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const MODO_BOT_PRIVADO = process.env.MODO_BOT_PRIVADO === "true";
 const DEBUG = process.env.DEBUG === "true";
+
+if (MODO_BOT_PRIVADO || process.env.BOT_COMBINADO === "true") {
+  cron.schedule("*/30 * * * *", checkWeather);
+  cron.schedule("1 0 * * *", eliminarMensajesDelDia);
+}
+
 
 const API_URL = `https://api.openweathermap.org/data/2.5/weather?q=${CITY}&appid=${API_KEY}&units=metric`;
 const FORECAST_URL = `https://api.openweathermap.org/data/2.5/forecast?q=${CITY}&appid=${API_KEY}&units=metric`;
