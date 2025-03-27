@@ -20,60 +20,12 @@ let mensajesEnviados = [];
 let ultimoMensajeClima = "";
 let ultimoMensajeManana = "";
 let ultimoMensajeMasTarde = "";
-
-// Para evitar notificar la misma tormenta muchas veces:
 let ultimaTormentaNotificada = "";
 
-/** Envía un mensaje a Telegram en modo privado, guardando el ID para luego poder borrarlo si se desea. */
-async function sendTelegramNotification(message) {
-  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return;
-  const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
-  try {
-    const res = await axios.post(url, {
-      chat_id: TELEGRAM_CHAT_ID,
-      text: message,
-      parse_mode: "Markdown"
-    });
-    mensajesEnviados.push(res.data.result.message_id);
-  } catch (error) {
-    console.error("❌ Error al enviar a Telegram:", error.response?.data || error.message);
-  }
-}
-
-/** Borra todos los mensajes enviados en el día (almacenados en `mensajesEnviados`). */
-async function eliminarMensajesDelDia() {
-  const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/deleteMessage`;
-  for (const id of mensajesEnviados) {
-    try {
-      await axios.post(url, {
-        chat_id: TELEGRAM_CHAT_ID,
-        message_id: id
-      });
-    } catch (err) {
-      console.warn("⚠️ No se pudo borrar mensaje:", id);
-    }
-  }
-  mensajesEnviados = [];
-  ultimoMensajeClima = "";
-  ultimoMensajeManana = "";
-  ultimoMensajeMasTarde = "";
-  ultimaTormentaNotificada = "";
-}
-
-/** Función auxiliar para capitalizar la primera letra */
-function capitalize(text) {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-/** Genera un saludo según la hora local */
-function generarSaludo() {
-  const hora = new Date().getHours();
-  if (hora >= 5 && hora < 12) return "🌅 *Buenos días!*";
-  if (hora >= 12 && hora < 19) return "☀️ *Buenas tardes!*";
-  return "🌙 *Buenas noches!*";
-}
-
-/** Traduce descripciones del inglés al español si existen en el diccionario */
+/**  
+ * Función que traduce la descripción del clima al español.  
+ * Se mantiene exactamente como la proporcionaste.
+ */
 function traducirDescripcion(desc) {
   const traducciones = {
     "clear sky": "Cielo despejado",
@@ -97,66 +49,23 @@ function traducirDescripcion(desc) {
   return traducciones[desc.toLowerCase()] || capitalize(desc);
 }
 
-/** Envía el clima actual (si cambió) y chequea frío/calor extremo. */
-async function sendWeatherToTelegram(data) {
-  const mensaje = await getFullWeatherMessage();
-  if (mensaje !== ultimoMensajeClima) {
-    await sendTelegramNotification(mensaje);
-    ultimoMensajeClima = mensaje;
-  } else {
-    console.log("⏸️ Clima sin cambios. No se volvió a enviar.");
-  }
-
-  const temp = data.main.temp;
-  if (temp <= 0) await sendTelegramNotification(`🧊 *Frío extremo:* ${temp}°C ❄️`);
-  if (temp >= 35) await sendTelegramNotification(`🥵 *Calor extremo:* ${temp}°C 🔥`);
-
-  // Revisamos si hay tormenta/lluvia próxima en las próximas horas y notificamos
-  await checkStormForecast();
+/** Función auxiliar para capitalizar la primera letra de un texto */
+function capitalize(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/**
- * Chequea si en las próximas 3 horas hay pronóstico de lluvia/tormenta.
- * Si lo hay, envía notificación automática (modo privado) evitando repetir la misma.
- */
-async function checkStormForecast() {
-  try {
-    const res = await axios.get(FORECAST_URL);
-    const list = res.data.list.slice(0, 3); // Siguientes 3 intervalos (~9 horas en total)
-
-    // Buscamos un item con "rain" o "thunderstorm"
-    const itemTormenta = list.find(item => {
-      const main = item.weather[0].main.toLowerCase();
-      return main.includes("rain") || main.includes("thunder");
-    });
-
-    if (itemTormenta) {
-      const fecha = new Date(itemTormenta.dt * 1000);
-      const horaLocal = fecha.toLocaleTimeString("es-AR", {
-        hour: "2-digit",
-        minute: "2-digit"
-      });
-      const desc = traducirDescripcion(itemTormenta.weather[0].description);
-
-      // Construimos una "firma" de tormenta para no repetir la misma
-      const firmaTormenta = `${fecha.toISOString()}-${desc}`;
-
-      if (firmaTormenta !== ultimaTormentaNotificada) {
-        const mensaje = `⛈️ Se espera *${desc}* aproximadamente a las *${horaLocal}*.`;
-        await sendTelegramNotification(mensaje);
-        ultimaTormentaNotificada = firmaTormenta;
-      }
-    }
-  } catch (error) {
-    console.error("❌ Error en checkStormForecast:", error.message);
-  }
+/** Genera un saludo basado en la hora del día */
+function generarSaludo() {
+  const hora = new Date().getHours();
+  if (hora >= 5 && hora < 12) return "🌅 *Buenos días!*";
+  if (hora >= 12 && hora < 19) return "☀️ *Buenas tardes!*";
+  return "🌙 *Buenas noches!*";
 }
 
-/** Retorna un mensaje de clima completo con saludo, estado actual, etc. */
+/** Obtiene el clima actual utilizando la ciudad configurada en .env */
 async function getFullWeatherMessage() {
   const res = await axios.get(API_URL);
   const data = res.data;
-
   const temp = data.main.temp;
   const feelsLike = data.main.feels_like;
   const humidity = data.main.humidity;
@@ -177,16 +86,36 @@ async function getFullWeatherMessage() {
   );
 }
 
-/**
- * Retorna pronóstico a corto plazo (/mas-tarde) o para mañana (/mañana).
- * Se añade la fecha/hora específica para mayor detalle.
- */
+/** Obtiene el clima actual basándose en las coordenadas (latitud y longitud) */
+async function getWeatherByCoordinates(lat, lon) {
+    try {
+      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`;
+      const res = await axios.get(url);
+      const data = res.data;
+  
+      // Si 'data.name' está vacío o es null, usamos 'tu ubicación' como fallback
+      const placeName = data.name && data.name.trim() ? data.name : "tu ubicación";
+      
+      const desc = traducirDescripcion(data.weather[0].description);
+      return (
+        `🌤️ *Clima actual en ${placeName}*\n` +
+        `🌡️ Temperatura: ${data.main.temp}°C\n` +
+        `🌥️ Estado: ${desc}\n` +
+        `💧 Humedad: ${data.main.humidity}%\n` +
+        `💨 Viento: ${data.wind.speed} km/h`
+      );
+    } catch (error) {
+      console.error("❌ Error en getWeatherByCoordinates:", error.message);
+      return "❌ No se pudo obtener el clima para tu ubicación.";
+    }
+  }
+
+/** Obtiene pronóstico; "short" para las próximas horas, "mañana" para el día siguiente */
 async function getForecastData(tipo = "mañana") {
   const res = await axios.get(FORECAST_URL);
   const list = res.data.list;
 
   if (tipo === "short") {
-    // Próximas 3 "instancias" (~9 horas)
     const horas = list.slice(0, 3).map(item => {
       const fecha = new Date(item.dt * 1000);
       const horaLocal = fecha.toLocaleString("es-AR", {
@@ -203,11 +132,9 @@ async function getForecastData(tipo = "mañana") {
     if (mensaje !== ultimoMensajeMasTarde) {
       ultimoMensajeMasTarde = mensaje;
       return mensaje;
-    } else {
-      return null;
     }
+    return null;
   } else {
-    // Pronóstico para mañana
     const mañana = new Date();
     mañana.setDate(mañana.getDate() + 1);
     const mañanaStr = mañana.toISOString().split("T")[0];
@@ -224,40 +151,31 @@ async function getForecastData(tipo = "mañana") {
 
     const min = Math.min(...temps).toFixed(1);
     const max = Math.max(...temps).toFixed(1);
-    const desc = traducirDescripcion(
-      descripciones[Math.floor(descripciones.length / 2)] || descripciones[0]
-    );
+    const desc = traducirDescripcion(descripciones[Math.floor(descripciones.length / 2)] || descripciones[0]);
 
-    const mensaje =
-      `📅 *Pronóstico para mañana (${formateada}):*\n` +
-      `🌡️ Mínima: ${min}°C | Máxima: ${max}°C\n` +
-      `🌥️ Estado general: ${desc}`;
+    const mensaje = `📅 *Pronóstico para mañana (${formateada}):*\n` +
+                    `🌡️ Mínima: ${min}°C | Máxima: ${max}°C\n` +
+                    `🌥️ Estado general: ${desc}`;
 
     if (mensaje !== ultimoMensajeManana) {
       ultimoMensajeManana = mensaje;
       return mensaje;
-    } else {
-      return null;
     }
+    return null;
   }
 }
 
-/**
- * Verifica alertas: frío/calor extremo, lluvia inminente.  
- * Además, ahora listamos aproximaciones de lluvia/tormenta con fecha/hora.
- */
+/** Chequea alertas (frío/calor extremo, lluvias o tormentas) */
 async function checkAlerts() {
   const clima = await axios.get(API_URL);
   const forecast = await axios.get(FORECAST_URL);
   const list = forecast.data.list;
-
   const temp = clima.data.main.temp;
   let alertas = [];
 
   if (temp <= 0) alertas.push(`🧊 *Frío extremo:* ${temp}°C ❄️`);
   if (temp >= 35) alertas.push(`🥵 *Calor extremo:* ${temp}°C 🔥`);
 
-  // Revisamos si hay lluvia o tormenta en los próximos 8 intervalos (~24 horas)
   const proximosEventos = list.slice(0, 8).filter(item => {
     const main = item.weather[0].main.toLowerCase();
     return main.includes("rain") || main.includes("thunder");
@@ -278,62 +196,129 @@ async function checkAlerts() {
     alertas.push(`🌧️ *Se esperan lluvias/tormentas*:\n${detalles}`);
   }
 
-  return alertas.length
-    ? `⚠️ *Alertas activas:*\n` + alertas.join('\n')
-    : "✅ No hay alertas activas por ahora.";
+  return alertas.length ? `⚠️ *Alertas activas:*\n` + alertas.join('\n') : "✅ No hay alertas activas por ahora.";
 }
 
-/** Llamada periódica en modo privado: envía clima y chequea cambios bruscos. */
+/** Envía notificaciones a modo privado */
+async function sendTelegramNotification(message) {
+  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return;
+  const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
+  try {
+    const res = await axios.post(url, {
+      chat_id: TELEGRAM_CHAT_ID,
+      text: message,
+      parse_mode: "Markdown"
+    });
+    mensajesEnviados.push(res.data.result.message_id);
+  } catch (error) {
+    console.error("❌ Error al enviar a Telegram:", error.response?.data || error.message);
+  }
+}
+
+/** Chequea si en las próximas horas hay pronóstico de lluvia o tormenta y notifica */
+async function checkStormForecast() {
+  try {
+    const res = await axios.get(FORECAST_URL);
+    const list = res.data.list.slice(0, 3);
+    const itemTormenta = list.find(item => {
+      const main = item.weather[0].main.toLowerCase();
+      return main.includes("rain") || main.includes("thunder");
+    });
+    if (itemTormenta) {
+      const fecha = new Date(itemTormenta.dt * 1000);
+      const horaLocal = fecha.toLocaleTimeString("es-AR", {
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+      const desc = traducirDescripcion(itemTormenta.weather[0].description);
+      const firmaTormenta = `${fecha.toISOString()}-${desc}`;
+      if (firmaTormenta !== ultimaTormentaNotificada) {
+        const mensaje = `⛈️ Se espera *${desc}* aproximadamente a las *${horaLocal}*.`;
+        await sendTelegramNotification(mensaje);
+        ultimaTormentaNotificada = firmaTormenta;
+      }
+    }
+  } catch (error) {
+    console.error("❌ Error en checkStormForecast:", error.message);
+  }
+}
+
+/** Verifica el clima y envía notificaciones si hay cambios significativos */
 async function checkWeather() {
   const response = await axios.get(API_URL);
   const data = response.data;
   const temp = data.main.temp;
 
-  // Envía el clima actual si hay cambios
   await sendWeatherToTelegram(data);
 
-  // Notifica cambio brusco de temperatura (≥ 5°C)
   if (lastTemp !== null && Math.abs(temp - lastTemp) >= 5) {
-    await sendTelegramNotification(
-      `⚠️ *Cambio brusco en la temperatura:* ${lastTemp}°C → ${temp}°C`
-    );
+    await sendTelegramNotification(`⚠️ *Cambio brusco en la temperatura:* ${lastTemp}°C → ${temp}°C`);
   }
-
   lastTemp = temp;
 }
 
-/** Programación de tareas con cron si está en modo privado. */
-if (MODO_BOT_PRIVADO) {
-  cron.schedule("*/30 * * * *", checkWeather);
-  cron.schedule("1 0 * * *", eliminarMensajesDelDia);
+/** Envía el mensaje de clima actual a modo privado y chequea alertas */
+async function sendWeatherToTelegram(data) {
+  const mensaje = await getFullWeatherMessage();
+  if (mensaje !== ultimoMensajeClima) {
+    await sendTelegramNotification(mensaje);
+    ultimoMensajeClima = mensaje;
+  } else {
+    console.log("⏸️ Clima sin cambios. No se volvió a enviar.");
+  }
+
+  const temp = data.main.temp;
+  if (temp <= 0) await sendTelegramNotification(`🧊 *Frío extremo:* ${temp}°C ❄️`);
+  if (temp >= 35) await sendTelegramNotification(`🥵 *Calor extremo:* ${temp}°C 🔥`);
+
+  await checkStormForecast();
 }
 
-/** Inicia el servidor Express (opcional si quieres tener un endpoint activo). */
+if (MODO_BOT_PRIVADO) {
+  cron.schedule("*/30 * * * *", checkWeather);
+  cron.schedule("1 0 * * *", async () => {
+    // Elimina mensajes antiguos al iniciar un nuevo día
+    for (const id of mensajesEnviados) {
+      const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/deleteMessage`;
+      try {
+        await axios.post(url, {
+          chat_id: TELEGRAM_CHAT_ID,
+          message_id: id
+        });
+      } catch (err) {
+        console.warn("⚠️ No se pudo borrar mensaje:", id);
+      }
+    }
+    mensajesEnviados = [];
+    ultimoMensajeClima = "";
+    ultimoMensajeManana = "";
+    ultimoMensajeMasTarde = "";
+    ultimaTormentaNotificada = "";
+  });
+}
+
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`🚀 Servidor en http://localhost:${PORT}`);
     if (MODO_BOT_PRIVADO) {
-      // Primera ejecución inmediata
       checkWeather();
     }
   });
 }
 
-/** Exportamos para que comandos.js use estas funciones. */
 module.exports = {
   getCurrentWeather: async () => {
     const res = await axios.get(API_URL);
     const data = res.data;
     const desc = traducirDescripcion(data.weather[0].description);
-    return (
-      `🌤️ *Clima actual en ${CITY}*\n` +
-      `🌡️ Temperatura: ${data.main.temp}°C\n` +
-      `🌥️ Estado: ${desc}\n` +
-      `💧 Humedad: ${data.main.humidity}%\n` +
-      `💨 Viento: ${data.wind.speed} km/h`
-    );
+    return `🌤️ *Clima actual en ${CITY}*\n` +
+           `🌡️ Temperatura: ${data.main.temp}°C\n` +
+           `🌥️ Estado: ${desc}\n` +
+           `💧 Humedad: ${data.main.humidity}%\n` +
+           `💨 Viento: ${data.wind.speed} km/h`;
   },
   getForecastData,
   checkAlerts,
-  getFullWeatherMessage
+  getFullWeatherMessage,
+  getWeatherByCoordinates
 };
