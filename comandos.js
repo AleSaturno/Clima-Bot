@@ -11,6 +11,9 @@ const {
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 let lastUpdateId = 0;
 
+/**
+ * Envía una respuesta de texto simple a un chat.
+ */
 async function sendTelegramReply(chatId, text) {
   if (!text || !chatId) return;
   const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
@@ -18,6 +21,21 @@ async function sendTelegramReply(chatId, text) {
     chat_id: chatId,
     text,
     parse_mode: "Markdown"
+  });
+}
+
+/**
+ * Envía un mensaje con un teclado personalizado.
+ * En este caso, el teclado incluye un botón para compartir ubicación.
+ */
+async function sendTelegramKeyboard(chatId, text, keyboard) {
+  if (!text || !chatId) return;
+  const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
+  await axios.post(url, {
+    chat_id: chatId,
+    text,
+    parse_mode: "Markdown",
+    reply_markup: keyboard
   });
 }
 
@@ -53,7 +71,7 @@ setInterval(async () => {
       );
       if (!chatId) continue;
       if (location) {
-        // Si se envía la ubicación, obtenemos el clima para esa coordenada
+        // Si se envía la ubicación, obtenemos el clima para esa coordenada.
         const { latitude, longitude } = location;
         const info = await getWeatherByCoordinates(latitude, longitude);
         await sendTelegramReply(chatId, info);
@@ -70,10 +88,20 @@ setInterval(async () => {
         const info = await checkAlerts();
         await sendTelegramReply(chatId, info);
       } else if (msgTexto === "/ubicacion" || msgTexto === "/ubicación") {
-        // Instruye al usuario para que comparta su ubicación
-        await sendTelegramReply(
+        // Envia un mensaje con teclado para que el usuario comparta su ubicación
+        const keyboard = {
+          keyboard: [
+            [
+              { text: "Compartir ubicación", request_location: true }
+            ]
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true
+        };
+        await sendTelegramKeyboard(
           chatId,
-          "📍 Por favor, comparte tu ubicación usando el botón de ubicación."
+          "📍 Para ver el clima en tu zona, toca el botón de abajo y comparte tu ubicación.",
+          keyboard
         );
       } else if (msgTexto === "/start") {
         await sendTelegramReply(chatId, mensajeDeAyuda());
