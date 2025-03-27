@@ -76,6 +76,7 @@ El segundo archivo (comandos.js) hace polling a la API de Telegram cada 5 segund
 ```
 
 🏃 Uso
+
 /start → Muestra la lista de comandos disponibles
 
 /ahora → Muestra el clima actual en la ciudad configurada en .env (CITY)
