@@ -3,8 +3,6 @@ const express = require("express");
 const axios = require("axios");
 const cron = require("node-cron");
 
-
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -13,24 +11,15 @@ const CITY = process.env.CITY;
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const MODO_BOT_PRIVADO = process.env.MODO_BOT_PRIVADO === "true";
-const DEBUG = process.env.DEBUG === "true";
-
-if (MODO_BOT_PRIVADO || process.env.BOT_COMBINADO === "true") {
-  cron.schedule("*/30 * * * *", checkWeather);
-  cron.schedule("1 0 * * *", eliminarMensajesDelDia);
-}
-
 
 const API_URL = `https://api.openweathermap.org/data/2.5/weather?q=${CITY}&appid=${API_KEY}&units=metric`;
 const FORECAST_URL = `https://api.openweathermap.org/data/2.5/forecast?q=${CITY}&appid=${API_KEY}&units=metric`;
 
 let lastTemp = null;
 let mensajesEnviados = [];
-let cacheClima = {};
-
-function logDebug(...args) {
-  if (DEBUG) console.log(...args);
-}
+let ultimoMensajeClima = "";
+let ultimoMensajeManana = "";
+let ultimoMensajeMasTarde = [];
 
 function capitalize(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
@@ -70,9 +59,8 @@ async function sendTelegramNotification(message) {
       parse_mode: "Markdown"
     });
     mensajesEnviados.push(res.data.result.message_id);
-    logDebug("📤 Mensaje enviado a Telegram");
   } catch (error) {
-    logDebug("❌ Error al enviar a Telegram:", error.response?.data || error.message);
+    console.error("❌ Error al enviar a Telegram:", error.response?.data || error.message);
   }
 }
 
@@ -85,26 +73,22 @@ async function eliminarMensajesDelDia() {
         message_id: id
       });
     } catch {
-      logDebug("⚠️ No se pudo borrar mensaje:", id);
+      console.warn("⚠️ No se pudo borrar mensaje:", id);
     }
   }
   mensajesEnviados = [];
-  cacheClima[TELEGRAM_CHAT_ID] = "";
-  logDebug("🧹 Historial de mensajes limpiado");
+  ultimoMensajeClima = "";
+  ultimoMensajeManana = "";
+  ultimoMensajeMasTarde = [];
 }
 
 async function sendWeatherToTelegram(data) {
   const mensaje = await getFullWeatherMessage();
-
-  if (!cacheClima[TELEGRAM_CHAT_ID]) {
-    cacheClima[TELEGRAM_CHAT_ID] = "";
-  }
-
-  if (cacheClima[TELEGRAM_CHAT_ID] !== mensaje) {
+  if (mensaje !== ultimoMensajeClima) {
     await sendTelegramNotification(mensaje);
-    cacheClima[TELEGRAM_CHAT_ID] = mensaje;
+    ultimoMensajeClima = mensaje;
   } else {
-    logDebug("⏸️ Clima sin cambios. No se volvió a enviar.");
+    console.log("⏸️ Clima sin cambios. No se volvió a enviar.");
   }
 
   const temp = data.main.temp;
@@ -146,7 +130,10 @@ async function getForecastData(tipo = "mañana") {
       const desc = traducirDescripcion(item.weather[0].description);
       return `🕒 *${hora}:* ${item.main.temp.toFixed(1)}°C, ${desc}`;
     }).join('\n');
-    return `🔮 *Próximas horas:*\n${horas}`;
+    const mensaje = `🔮 *Próximas horas:*\n${horas}`;
+    if (ultimoMensajeMasTarde.includes(mensaje)) return null;
+    ultimoMensajeMasTarde.push(mensaje);
+    return mensaje;
   } else {
     const mañana = new Date();
     mañana.setDate(mañana.getDate() + 1);
@@ -162,9 +149,16 @@ async function getForecastData(tipo = "mañana") {
     const max = Math.max(...temps).toFixed(1);
     const desc = traducirDescripcion(descripciones[Math.floor(descripciones.length / 2)] || descripciones[0]);
 
-    return `📅 *Pronóstico para mañana (${formateada}):*\n` +
+    const mensaje = `📅 *Pronóstico para mañana (${formateada}):*\n` +
       `🌡️ Mínima: ${min}°C | Máxima: ${max}°C\n` +
       `🌥️ Estado general: ${desc}`;
+
+    if (mensaje !== ultimoMensajeManana) {
+      ultimoMensajeManana = mensaje;
+      return mensaje;
+    } else {
+      return null;
+    }
   }
 }
 
@@ -191,26 +185,21 @@ async function checkAlerts() {
 }
 
 async function checkWeather() {
-  logDebug(`⏰ [${new Date().toLocaleTimeString()}] Ejecutando checkWeather()`);
+  const response = await axios.get(API_URL);
+  const data = response.data;
+  const temp = data.main.temp;
 
-  try {
-    const response = await axios.get(API_URL);
-    const data = response.data;
-    const temp = data.main.temp;
+  await sendWeatherToTelegram(data);
 
-    await sendWeatherToTelegram(data);
-
-    if (lastTemp !== null && Math.abs(temp - lastTemp) >= 5) {
-      await sendTelegramNotification(`⚠️ *Cambio brusco en la temperatura:* ${lastTemp}°C → ${temp}°C`);
-    }
-
-    lastTemp = temp;
-  } catch (error) {
-    logDebug("❌ Error en checkWeather():", error.message);
+  if (lastTemp !== null && Math.abs(temp - lastTemp) >= 5) {
+    await sendTelegramNotification(`⚠️ *Cambio brusco en la temperatura:* ${lastTemp}°C → ${temp}°C`);
   }
+
+  lastTemp = temp;
 }
 
-if (MODO_BOT_PRIVADO) {
+// ✅ SOLO corre cron si el modo está activado o ejecutás desde bot.js
+if (MODO_BOT_PRIVADO || process.env.BOT_COMBINADO === "true") {
   cron.schedule("*/30 * * * *", checkWeather);
   cron.schedule("1 0 * * *", eliminarMensajesDelDia);
 }
