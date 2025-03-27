@@ -33,7 +33,6 @@ Un bot de Telegram que consulta el clima actual, pronóstico para más tarde o e
    git clone https://github.com/tu-usuario/bot-clima.git
    cd bot-clima
    npm install
-```
 2-Configura el archivo .env en la raíz del proyecto (puedes basarte en un .env.example). Ejemplo:
 ```
 API_KEY=TU_API_KEY_DE_OPENWEATHER
@@ -42,6 +41,7 @@ TELEGRAM_TOKEN=TU_BOT_TOKEN
 TELEGRAM_CHAT_ID=123456789
 MODO_BOT_PRIVADO=true
 PORT=3000
+```
 ```
 API_KEY: Tu clave de OpenWeatherMap
 
@@ -103,13 +103,11 @@ Para integrar reconocimiento de voz real, necesitarías un servicio externo. En 
 ¡Son bienvenidas! Haz un fork del repositorio, crea tu rama y envía un pull request.
 
 📄 Licencia
-MIT © 2023 - Alejandro Saturno
+MIT © 2025 - Alejandro Saturno
 
 Este proyecto está bajo la licencia MIT, por lo que puedes usarlo libremente y adaptarlo a tus necesidades.
 
 ```
----
-
 ### Notas
 
 1. **Mantuvimos la sección de “Requisitos”, “Instalación” y “Uso”**, pero agregamos los detalles de la nueva función `/ubicacion`, la respuesta a la ubicación y las traducciones adicionales.  
