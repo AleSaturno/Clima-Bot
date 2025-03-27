@@ -4,13 +4,13 @@ const {
   getCurrentWeather,
   getForecastData,
   checkAlerts,
-  getFullWeatherMessage
+  getFullWeatherMessage,
+  getWeatherByCoordinates
 } = require("./index");
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 let lastUpdateId = 0;
 
-/** Envía una respuesta de texto a un chat específico usando la API de Telegram */
 async function sendTelegramReply(chatId, text) {
   if (!text || !chatId) return;
   const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
@@ -21,7 +21,6 @@ async function sendTelegramReply(chatId, text) {
   });
 }
 
-/** Mensaje de ayuda para /start */
 function mensajeDeAyuda() {
   return (
     `👋 *¡Hola! Soy tu bot del clima.*\n\n` +
@@ -29,33 +28,36 @@ function mensajeDeAyuda() {
     `• /ahora → Ver clima actual\n` +
     `• /mas-tarde → Pronóstico próximas horas\n` +
     `• /mañana → Pronóstico del día siguiente\n` +
-    `• /alertas → Ver alertas activas\n\n` +
+    `• /alertas → Ver alertas activas\n` +
+    `• /ubicacion → Comparte tu ubicación para ver el clima en tu zona\n\n` +
     `🌤️ ¡Estoy listo para informarte!`
   );
 }
 
-/**
- * Cada 5 segundos, llama a getUpdates para ver si hay nuevos mensajes.
- * Responde según el comando recibido.
- */
 setInterval(async () => {
   try {
     const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/getUpdates?offset=${lastUpdateId + 1}`;
     const res = await axios.get(url);
     const updates = res.data.result;
-
     if (!updates.length) return;
-
     for (const update of updates) {
       const msgTexto = update.message?.text?.toLowerCase();
       const esVoz = !!update.message?.voice;
+      const location = update.message?.location;
       const chatId = update.message?.chat?.id;
-
-      console.log("📥 Mensaje recibido:", msgTexto || (esVoz && "[voz]"), "de", chatId);
-
+      console.log(
+        "📥 Mensaje recibido:",
+        msgTexto || (esVoz && "[voz]") || (location && "[ubicación]"),
+        "de",
+        chatId
+      );
       if (!chatId) continue;
-
-      if (msgTexto === "/ahora") {
+      if (location) {
+        // Si se envía la ubicación, obtenemos el clima para esa coordenada
+        const { latitude, longitude } = location;
+        const info = await getWeatherByCoordinates(latitude, longitude);
+        await sendTelegramReply(chatId, info);
+      } else if (msgTexto === "/ahora") {
         const info = await getCurrentWeather();
         await sendTelegramReply(chatId, info);
       } else if (msgTexto === "/mas-tarde") {
@@ -67,6 +69,12 @@ setInterval(async () => {
       } else if (msgTexto === "/alertas") {
         const info = await checkAlerts();
         await sendTelegramReply(chatId, info);
+      } else if (msgTexto === "/ubicacion" || msgTexto === "/ubicación") {
+        // Instruye al usuario para que comparta su ubicación
+        await sendTelegramReply(
+          chatId,
+          "📍 Por favor, comparte tu ubicación usando el botón de ubicación."
+        );
       } else if (msgTexto === "/start") {
         await sendTelegramReply(chatId, mensajeDeAyuda());
       } else if (esVoz) {
@@ -74,13 +82,10 @@ setInterval(async () => {
         const mensaje = `🎙️ *¡Escuché tu audio!*\n\n${clima}`;
         await sendTelegramReply(chatId, mensaje);
       } else if (msgTexto) {
-        // Cualquier otro texto => Enviamos el clima completo
         const clima = await getFullWeatherMessage();
         await sendTelegramReply(chatId, clima);
       }
     }
-
-    // Actualizamos para no procesar dos veces el mismo mensaje
     lastUpdateId = updates[updates.length - 1].update_id;
   } catch (error) {
     console.error("❌ Error al procesar comandos:", error.message);
