@@ -54,9 +54,8 @@ TELEGRAM_CHAT_ID: ID de tu chat si usas modo privado
 MODO_BOT_PRIVADO=true: Activa las notificaciones automáticas
 
 PORT=3000: Puerto para el servidor (por defecto 3000)
-
-3-Ejecuta el bot
 ```
+3-Ejecuta el bot
 # 1) Inicia el servidor (cron y notificaciones, si estás en modo privado)
 node index.js
 
