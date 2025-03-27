@@ -56,6 +56,7 @@ MODO_BOT_PRIVADO=true: Activa las notificaciones automáticas
 PORT=3000: Puerto para el servidor (por defecto 3000)
 ```
 3-Ejecuta el bot
+```
 # 1) Inicia el servidor (cron y notificaciones, si estás en modo privado)
 node index.js
 
@@ -71,7 +72,8 @@ Programar tareas cron (por ejemplo, alertas cada 30 min) en modo privado
 Proveer funciones para obtener el clima
 
 El segundo archivo (comandos.js) hace polling a la API de Telegram cada 5 segundos y responde a los comandos que envíen los usuarios.
-
+```
+```
 
 🏃 Uso
 /start → Muestra la lista de comandos disponibles
