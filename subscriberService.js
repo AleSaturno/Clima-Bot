@@ -1,50 +1,57 @@
-const fs = require('fs');
-const path = require('path');
+const { Pool } = require('pg');
 
-const subscribersFilePath = path.join(__dirname, 'subscribers.json');
-let subscribers = new Set();
+// Configura el pool usando la variable DATABASE_URL del .env
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
-// Carga las suscripciones desde el archivo JSON (si existe)
-function loadSubscribers() {
+// Inicializa la tabla de suscriptores si no existe
+async function init() {
   try {
-    if (fs.existsSync(subscribersFilePath)) {
-      const data = fs.readFileSync(subscribersFilePath, 'utf8');
-      const parsed = JSON.parse(data);
-      subscribers = new Set(parsed);
-      console.log("Suscriptores cargados:", Array.from(subscribers));
-    } else {
-      console.log("No existe archivo de suscriptores. Se creará uno nuevo.");
-    }
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS subscribers (
+        chat_id BIGINT PRIMARY KEY
+      );
+    `);
+    console.log("Tabla 'subscribers' verificada o creada.");
   } catch (err) {
-    console.error("Error al cargar los suscriptores:", err);
+    console.error("Error al inicializar la tabla 'subscribers':", err);
   }
 }
 
-// Guarda las suscripciones en el archivo JSON
-function saveSubscribers() {
+// Agrega un suscriptor (chat_id) a la base de datos
+async function addSubscriber(chatId) {
   try {
-    const data = JSON.stringify(Array.from(subscribers), null, 2);
-    fs.writeFileSync(subscribersFilePath, data, 'utf8');
+    await pool.query(
+      'INSERT INTO subscribers (chat_id) VALUES ($1) ON CONFLICT (chat_id) DO NOTHING;',
+      [chatId]
+    );
   } catch (err) {
-    console.error("Error al guardar los suscriptores:", err);
+    console.error("Error al agregar suscriptor:", err);
   }
 }
 
-function addSubscriber(chatId) {
-  subscribers.add(chatId);
-  saveSubscribers();
+// Elimina un suscriptor (chat_id) de la base de datos
+async function removeSubscriber(chatId) {
+  try {
+    await pool.query('DELETE FROM subscribers WHERE chat_id = $1;', [chatId]);
+  } catch (err) {
+    console.error("Error al remover suscriptor:", err);
+  }
 }
 
-function removeSubscriber(chatId) {
-  subscribers.delete(chatId);
-  saveSubscribers();
+// Obtiene la lista de suscriptores (chat_id) almacenados en la base de datos
+async function getSubscribers() {
+  try {
+    const res = await pool.query('SELECT chat_id FROM subscribers;');
+    return res.rows.map(row => row.chat_id);
+  } catch (err) {
+    console.error("Error al obtener suscriptores:", err);
+    return [];
+  }
 }
 
-function getSubscribers() {
-  return Array.from(subscribers);
-}
-
-loadSubscribers();
+init();
 
 module.exports = {
   addSubscriber,
