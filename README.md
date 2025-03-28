@@ -12,7 +12,7 @@ Un bot de Telegram que consulta el clima actual, pronóstico para más tarde o e
 - **Alertas**: `/alertas` (calor, frío extremo, lluvia o tormenta)
 - **Compartir ubicación**: `/ubicacion` → El bot pide tu ubicación y te muestra el clima de tus coordenadas
 - **Mensajes de voz**: El bot responde con un mensaje de clima; puedes integrar un servicio de voz (como Google Cloud Speech-to-Text) si quieres que reconozca órdenes habladas
-- **Modo privado (opcional)**: El bot envía notificaciones automáticas cada 30 minutos a un chat específico
+- **Modo privado (opcional)**: El bot envía notificaciones automáticas cada 60 minutos a un chat específico
 - **Limpieza automática** de mensajes a medianoche, si usas modo privado
 
 ---
