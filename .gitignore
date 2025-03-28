@@ -14,3 +14,6 @@ node_modules/
 
 # Sistema operativo
 Thumbs.db
+
+# Archivo de suscriptores persistentes
+subscribers.json
