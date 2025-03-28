@@ -368,7 +368,7 @@ if (MODO_BOT_PRIVADO) {
 } else {
   // Modo público: Envia alertas a todos los suscriptores
   const { getSubscribers } = require("./subscriberService");
-  cron.schedule("*/30 * * * *", async () => {
+  cron.schedule("*/60 * * * *", async () => {
     const subs = getSubscribers();
     if (subs.length === 0) {
       console.log("No hay suscriptores para enviar alertas.");
