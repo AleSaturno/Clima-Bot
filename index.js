@@ -345,7 +345,8 @@ async function sendWeatherToTelegram(data) {
 }
 
 if (MODO_BOT_PRIVADO) {
-  cron.schedule("*0 * * * *", checkWeather);
+  // Ejecuta checkWeather cada 1 hora (al minuto 0)
+  cron.schedule("0 * * * *", checkWeather);
   cron.schedule("1 0 * * *", async () => {
     // Eliminamos mensajes antiguos del día
     for (const id of mensajesEnviados) {
@@ -366,9 +367,9 @@ if (MODO_BOT_PRIVADO) {
     ultimaTormentaNotificada = "";
   });
 } else {
-  // Modo público: Envia alertas a todos los suscriptores
+  // Modo público: Envia alertas a todos los suscriptores cada 1 hora
   const { getSubscribers } = require("./subscriberService");
-  cron.schedule("*0 * * * *", async () => {
+  cron.schedule("0 * * * *", async () => {
     const subs = getSubscribers();
     if (subs.length === 0) {
       console.log("No hay suscriptores para enviar alertas.");
@@ -392,6 +393,7 @@ if (MODO_BOT_PRIVADO) {
     }
   });
 }
+
 
 
 module.exports = {
