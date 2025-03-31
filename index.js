@@ -345,7 +345,7 @@ async function sendWeatherToTelegram(data) {
 }
 
 if (MODO_BOT_PRIVADO) {
-  cron.schedule("*/30 * * * *", checkWeather);
+  cron.schedule("*0 * * * *", checkWeather);
   cron.schedule("1 0 * * *", async () => {
     // Eliminamos mensajes antiguos del día
     for (const id of mensajesEnviados) {
@@ -368,7 +368,7 @@ if (MODO_BOT_PRIVADO) {
 } else {
   // Modo público: Envia alertas a todos los suscriptores
   const { getSubscribers } = require("./subscriberService");
-  cron.schedule("*/60 * * * *", async () => {
+  cron.schedule("*0 * * * *", async () => {
     const subs = getSubscribers();
     if (subs.length === 0) {
       console.log("No hay suscriptores para enviar alertas.");
