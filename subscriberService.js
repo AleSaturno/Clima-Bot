@@ -1,8 +1,11 @@
 const { Pool } = require('pg');
 
-// Configura el pool usando la variable DATABASE_URL del .env
+const isProduction = process.env.NODE_ENV === 'production';
+const connectionString = process.env.DATABASE_URL;
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString,
+  ssl: isProduction ? { rejectUnauthorized: false } : false
 });
 
 // Inicializa la tabla de suscriptores si no existe
@@ -15,7 +18,8 @@ async function init() {
     `);
     console.log("Tabla 'subscribers' verificada o creada.");
   } catch (err) {
-    console.error("Error al inicializar la tabla 'subscribers':", err);
+    console.warn("⚠️ No se pudo conectar a la Base de Datos. El bot funcionará SIN persistencia de suscriptores.");
+    console.warn("Error detalle:", err.message);
   }
 }
 
