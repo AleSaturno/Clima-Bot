@@ -61,13 +61,21 @@ bot.command(["ubicacion", "ubicación", "ub"], (ctx) => {
 });
 
 bot.command("subscribe", async (ctx) => {
-    await subscriberService.addSubscriber(ctx.chat.id);
-    ctx.reply("✅ Te has suscrito a las alertas automáticas de clima.");
+    const success = await subscriberService.addSubscriber(ctx.chat.id);
+    if (success) {
+        ctx.reply("✅ Te has suscrito a las alertas automáticas de clima.");
+    } else {
+        ctx.reply("⚠️ Hubo un error al intentar suscribirte (Error de Base de Datos). Intenta nuevamente más tarde.");
+    }
 });
 
 bot.command("unsubscribe", async (ctx) => {
-    await subscriberService.removeSubscriber(ctx.chat.id);
-    ctx.reply("❌ Te has dado de baja de las alertas automáticas de clima.");
+    const success = await subscriberService.removeSubscriber(ctx.chat.id);
+    if (success) {
+        ctx.reply("❌ Te has dado de baja de las alertas automáticas de clima.");
+    } else {
+        ctx.reply("⚠️ Hubo un error al intentar desuscribirte. Intenta nuevamente más tarde.");
+    }
 });
 
 bot.on("location", async (ctx) => {

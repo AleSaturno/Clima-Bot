@@ -30,8 +30,10 @@ async function addSubscriber(chatId) {
       'INSERT INTO subscribers (chat_id) VALUES ($1) ON CONFLICT (chat_id) DO NOTHING;',
       [chatId]
     );
+    return true;
   } catch (err) {
     console.error("Error al agregar suscriptor:", err);
+    return false;
   }
 }
 
@@ -39,8 +41,10 @@ async function addSubscriber(chatId) {
 async function removeSubscriber(chatId) {
   try {
     await pool.query('DELETE FROM subscribers WHERE chat_id = $1;', [chatId]);
+    return true;
   } catch (err) {
     console.error("Error al remover suscriptor:", err);
+    return false;
   }
 }
 
