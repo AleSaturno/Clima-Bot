@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: bot-clima
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    plan: free
+    autoDeploy: false
+    envVars:
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: API_KEY
+        sync: false
+      - key: CITY
+        sync: false
+      - key: MODO_BOT_PRIVADO
+        value: "false"
+      - key: TZ
+        value: America/Argentina/Buenos_Aires
+      - key: DATABASE_URL
+        sync: false
